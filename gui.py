@@ -5,7 +5,7 @@ from debugger import Debugger
 class DebuggerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Python Debugger")
+        self.root.title("ReLive Debugger")
         self.root.geometry("600x400")
 
         # Initialize Debugger
