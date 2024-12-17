@@ -10,8 +10,8 @@ class Debugger:
         self._gui = gui
         self._pdb = None
         self._thread = None
-        self._command_queue = queue.Queue()  # Queue to handle commands from the GUI
-        self._event = threading.Event()  # Event to synchronize with the debugger thread
+        self._command_queue = queue.Queue() 
+        self._event = threading.Event() 
 
     def start_debugging(self, script_path):
         """Start debugging in a separate thread to avoid blocking the UI."""
@@ -43,18 +43,14 @@ class Debugger:
                 with open(script_path, 'r') as script_file:
                     print("File successfully opened.")
                     script_code = script_file.read()
-
-                    # Redirect stdout and stderr to capture and display output in the GUI
                     sys.stdout = io.StringIO()
                     sys.stderr = io.StringIO()
 
                     self._pdb = pdb.Pdb()
-                    self._pdb.set_trace()  # Pause at the first breakpoint
+                    self._pdb.set_trace() 
 
-                    # Start executing the code with pdb
                     self._execute_script(script_code)
 
-                    # Capture and display the output
                     output = sys.stdout.getvalue()
                     error_output = sys.stderr.getvalue()
 
@@ -80,14 +76,14 @@ class Debugger:
                 command = self._command_queue.get()
 
                 if command == 'continue':
-                    self._pdb.set_continue()  # Continue execution
+                    self._pdb.set_continue()
                 elif command == 'step':
-                    self._pdb.set_step()  # Step to the next line
+                    self._pdb.set_step() 
 
             # Allow the debugger to step through the code
             try:
                 self._pdb.run(code)
-                self._event.wait()  # Wait for a command to be issued from the GUI
+                self._event.wait()
             except Exception as e:
                 self._gui.update_console(f"Error during execution: {str(e)}\n")
                 break

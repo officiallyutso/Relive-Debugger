@@ -40,17 +40,15 @@ class DebuggerGUI:
             messagebox.showerror("Error", "Please provide a valid script path")
             return
 
-        # Clear previous output
         self.console_output.delete(1.0, tk.END)
         
-        # Start debugging
         self.debugger.start_debugging(script_path)
         self.console_output.insert(tk.END, f"Debugging {script_path}...\n")
 
     def update_console(self, text):
         """Update the console with new output."""
         self.console_output.insert(tk.END, text)
-        self.console_output.yview(tk.END)  # Auto-scroll to the latest output
+        self.console_output.yview(tk.END)
 
     def step_over(self):
         """Step over the current line of code."""
@@ -62,4 +60,4 @@ class DebuggerGUI:
 
     def quit_debugger(self):
         """Quit the debugger and close the window."""
-        self.root.quit()  # Close the GUI window
+        self.root.quit()
