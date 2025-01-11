@@ -9,9 +9,22 @@ import inspect
 import time
 from werkzeug.serving import run_simple
 from flask.ctx import RequestContext
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
+import json
+import copy
 
 app = Flask(__name__, static_folder='frontend')
 debugger_instance = None
+
+class ProgramState:
+    def __init__(self):
+        self.variables = {}
+        self.stack_frames = []
+        self.current_line = None
+        self.output = ""
+        self.timestamp = time.time()
 
 class OutputBuffer:
     def __init__(self):
@@ -44,6 +57,9 @@ class WebDebugger(bdb.Bdb):
         self.stored_stderr = None
         self.next_command = None
         self.current_line = None
+        self.program_states = []
+        self.current_state_index = -1
+        self.max_states = 100
 
     def user_line(self, frame):
         with self._lock:
@@ -51,6 +67,8 @@ class WebDebugger(bdb.Bdb):
             self.current_line = frame.f_lineno
             self.stack_frames = self._get_stack_frames()
             self.variables = self._get_variables(frame)
+            
+            self._save_state()
             
             while self.is_running and not self.next_command:
                 time.sleep(0.1)
@@ -65,6 +83,8 @@ class WebDebugger(bdb.Bdb):
                     self.set_next(frame)
                 elif command == 'continue':
                     self.set_continue()
+                elif command == 'step_back':
+                    self._restore_previous_state()
                 elif command == 'quit':
                     self.set_quit()
 
@@ -81,12 +101,15 @@ class WebDebugger(bdb.Bdb):
         stack = []
         frame = self.current_frame
         while frame:
+            source_context = self._get_source_context(frame)
             stack.append({
                 'file': frame.f_code.co_filename,
                 'line': frame.f_lineno,
                 'function': frame.f_code.co_name,
                 'locals': {k: repr(v) for k, v in frame.f_locals.items()},
-                'source': self._get_source_context(frame)
+                'globals': {k: repr(v) for k, v in frame.f_globals.items() 
+                           if not k.startswith('__')},
+                'source': source_context
             })
             frame = frame.f_back
         return stack
@@ -97,13 +120,37 @@ class WebDebugger(bdb.Bdb):
             current_line = frame.f_lineno - start
             start_line = max(0, current_line - context_lines)
             end_line = min(len(lines), current_line + context_lines + 1)
+            source_lines = lines[start_line:end_line]
+            highlighted_source = highlight(''.join(source_lines), PythonLexer(), HtmlFormatter())
             return {
-                'lines': lines[start_line:end_line],
+                'lines': highlighted_source,
                 'start_line': start + start_line,
                 'current_line': frame.f_lineno
             }
         except:
             return None
+
+    def _save_state(self):
+        state = ProgramState()
+        state.variables = copy.deepcopy(self.variables)
+        state.stack_frames = copy.deepcopy(self.stack_frames)
+        state.current_line = self.current_line
+        state.output = self.output_buffer.getvalue()
+        
+        self.program_states.append(state)
+        self.current_state_index = len(self.program_states) - 1
+        
+        if len(self.program_states) > self.max_states:
+            self.program_states.pop(0)
+            self.current_state_index -= 1
+
+    def _restore_previous_state(self):
+        if self.current_state_index > 0:
+            self.current_state_index -= 1
+            state = self.program_states[self.current_state_index]
+            self.variables = state.variables
+            self.stack_frames = state.stack_frames
+            self.current_line = state.current_line
 
     def _get_variables(self, frame):
         return {
@@ -130,7 +177,7 @@ def run_code(code, debugger):
         compiled_code = compile(code, '<string>', 'exec')
         debugger.run(compiled_code)
     except Exception as e:
-        debugger.set_exception(str(e))
+        debugger.exception = str(e)
         print(f"Exception occurred: {str(e)}")
     finally:
         debugger.restore_io()
@@ -147,13 +194,18 @@ def start_debugger():
     if not code:
         return jsonify({"error": "No code provided"}), 400
 
+    highlighted_code = highlight(code, PythonLexer(), HtmlFormatter())
+    
     if debugger_instance and debugger_instance.is_running:
         debugger_instance.set_quit()
         time.sleep(0.5)
 
     debugger_instance = WebDebugger()
     threading.Thread(target=run_code, args=(code, debugger_instance), daemon=True).start()
-    return jsonify({"message": "Debugger started"})
+    return jsonify({
+        "message": "Debugger started",
+        "highlighted_code": highlighted_code
+    })
 
 @app.route("/status", methods=["GET"])
 def get_status():
@@ -168,7 +220,9 @@ def get_status():
         "breakpoints": debugger_instance.breakpoints.get('<string>', {}),
         "exception": debugger_instance.exception,
         "output": debugger_instance.output_buffer.getvalue(),
-        "current_line": debugger_instance.current_line
+        "current_line": debugger_instance.current_line,
+        "states": len(debugger_instance.program_states),
+        "current_state": debugger_instance.current_state_index
     }
     return jsonify(status)
 
@@ -197,12 +251,12 @@ def control_execution():
         return jsonify({"error": "Debugger not running"}), 400
     
     action = request.json.get("action")
+    valid_actions = ['step', 'step_over', 'continue', 'step_back', 'quit']
     
-    if action in ['step', 'step_over', 'continue', 'quit']:
-        debugger_instance.next_command = action
-    else:
+    if action not in valid_actions:
         return jsonify({"error": "Invalid action"}), 400
     
+    debugger_instance.next_command = action
     return jsonify({"message": f"Action '{action}' performed"})
 
 if __name__ == "__main__":
