@@ -189,6 +189,83 @@
             margin-top: 10px;
             font-size: 13px;
         }
+        .debug-info {
+            background-color: #252526;
+            border-top: 1px solid #3c3c3c;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+        }
+    
+        .variables-panel, .stack-panel {
+            padding: 15px;
+            overflow-y: auto;
+        }
+    
+        .section-title {
+            color: #cccccc;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+    
+        .variable-group {
+            margin-bottom: 15px;
+        }
+    
+        .variable-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            padding: 3px 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+    
+        .variable-name {
+            color: #9cdcfe;
+            white-space: nowrap;
+        }
+    
+        .variable-value {
+            color: #ce9178;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+    
+        .stack-frame {
+            padding: 8px;
+            margin: 4px 0;
+            background-color: #2d2d2d;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+    
+        .stack-frame:hover {
+            background-color: #383838;
+        }
+    
+        .stack-frame.active {
+            background-color: #044b6e;
+        }
+    
+        .frame-location {
+            color: #cccccc;
+            margin-bottom: 3px;
+        }
+    
+        .frame-function {
+            color: #dcdcaa;
+        }
+    
+        .frame-line {
+            color: #b5cea8;
+        }
     </style>
 </head>
 <body>
@@ -224,14 +301,15 @@
         
         <div class="debug-info">
             <div class="variables-panel">
-                <h3>Variables</h3>
+                <h3 class="section-title">Variables</h3>
                 <div id="variables"></div>
             </div>
             <div class="stack-panel">
-                <h3>Call Stack</h3>
+                <h3 class="section-title">Call Stack</h3>
                 <div id="stackTrace"></div>
             </div>
         </div>
+        
         
         <div class="output-panel">
             <h3>Output</h3>
@@ -473,6 +551,104 @@
         }
 
         updateButtons(false);
+        function updateVariables(variables) {
+            const variablesDiv = document.getElementById('variables');
+            let html = '';
+    
+            if (variables.locals && Object.keys(variables.locals).length > 0) {
+                html += '<div class="variable-group">';
+                html += '<div class="section-title">Local Variables</div>';
+                for (const [name, value] of Object.entries(variables.locals)) {
+                    html += `
+                        <div class="variable-item">
+                            <span class="variable-name">${name}</span>
+                            <span class="variable-value">${value}</span>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+    
+            if (variables.globals && Object.keys(variables.globals).length > 0) {
+                html += '<div class="variable-group">';
+                html += '<div class="section-title">Global Variables</div>';
+                for (const [name, value] of Object.entries(variables.globals)) {
+                    html += `
+                        <div class="variable-item">
+                            <span class="variable-name">${name}</span>
+                            <span class="variable-value">${value}</span>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+    
+            variablesDiv.innerHTML = html || '<div class="section-title">No variables to display</div>';
+        }
+    
+        function updateStackTrace(frames) {
+            const stackTrace = document.getElementById('stackTrace');
+            if (!frames || frames.length === 0) {
+                stackTrace.innerHTML = '<div class="section-title">No stack frames available</div>';
+                return;
+            }
+    
+            let html = '';
+            frames.forEach((frame, index) => {
+                html += `
+                    <div class="stack-frame ${index === 0 ? 'active' : ''}" onclick="jumpToFrame(${index})">
+                        <div class="frame-location">
+                            <span class="frame-function">${frame.function}</span>
+                            <span class="frame-line">Line ${frame.line}</span>
+                        </div>
+                        <div class="frame-file">${frame.file}</div>
+                    </div>
+                `;
+            });
+            stackTrace.innerHTML = html;
+        }
+    
+        function jumpToFrame(frameIndex) {
+            // Highlight the selected frame
+            document.querySelectorAll('.stack-frame').forEach((frame, index) => {
+                frame.classList.toggle('active', index === frameIndex);
+            });
+            
+            // Update the variables view for the selected frame
+            if (currentDebuggerState && currentDebuggerState.stack_frames) {
+                const frame = currentDebuggerState.stack_frames[frameIndex];
+                if (frame) {
+                    updateVariables({ locals: frame.locals });
+                    highlightLine(frame.line);
+                }
+            }
+        }
+    
+        // In the pollStatus function, update this part:
+        function updateDebuggerState(data) {
+            if (data.variables) {
+                updateVariables(data.variables);
+            }
+            
+            if (data.stack_frames) {
+                updateStackTrace(data.stack_frames);
+            }
+            
+            // Store current state for frame navigation
+            currentDebuggerState = data;
+            
+            if (data.current_line) {
+                highlightLine(data.current_line);
+            }
+            
+            if (data.output) {
+                output.textContent = data.output;
+            }
+            
+            if (data.exception) {
+                showError(data.exception);
+            }
+        }
     </script>
 </body>
 </html>
