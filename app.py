@@ -44,6 +44,78 @@ class OutputBuffer:
     def clear(self):
         self.buffer = StringIO()
         
+        
+        
+class ExecutionTracker:
+    def __init__(self):
+        self.execution_path = []
+        self.call_graph = {}
+        self.current_calls = []
+        
+    def add_execution_step(self, line_no, code, event_type):
+        """Track a single execution step"""
+        self.execution_path.append({
+            'line': line_no,
+            'code': code.strip() if code else '',
+            'event': event_type,
+            'timestamp': time.time(),
+            'call_depth': len(self.current_calls)
+        })
+    
+    def add_function_call(self, caller_line, caller_func, callee_func):
+        """Track function call relationships"""
+        if caller_func not in self.call_graph:
+            self.call_graph[caller_func] = {'calls': set(), 'called_from': set()}
+        
+        if callee_func not in self.call_graph:
+            self.call_graph[callee_func] = {'calls': set(), 'called_from': set()}
+            
+        self.call_graph[caller_func]['calls'].add(callee_func)
+        self.call_graph[callee_func]['called_from'].add(caller_func)
+        
+    def enter_function(self, func_name, line_no):
+        """Track entering a function"""
+        if self.current_calls:
+            self.add_function_call(line_no, self.current_calls[-1], func_name)
+        self.current_calls.append(func_name)
+        
+    def exit_function(self, func_name):
+        """Track exiting a function"""
+        if self.current_calls and self.current_calls[-1] == func_name:
+            self.current_calls.pop()
+            
+    def get_execution_flowchart(self):
+        """Generate Mermaid flowchart from execution path"""
+        nodes = []
+        edges = []
+        node_ids = {}
+        last_node = None
+        
+        for i, step in enumerate(self.execution_path):
+            node_id = f"node{i}"
+            label = f"{step['line']}: {step['code']}"
+            nodes.append(f"{node_id}[{label}]")
+            node_ids[step['line']] = node_id
+            
+            if last_node:
+                edges.append(f"{last_node} --> {node_id}")
+            last_node = node_id
+            
+        return "flowchart TB\n" + "\n".join(nodes) + "\n" + "\n".join(edges)
+        
+    def get_call_graph(self):
+        """Generate Mermaid diagram for call graph"""
+        nodes = []
+        edges = []
+        
+        for func in self.call_graph:
+            nodes.append(f"{func}[{func}]")
+            for called in self.call_graph[func]['calls']:
+                edges.append(f"{func} --> {called}")
+                
+        return "flowchart LR\n" + "\n".join(nodes) + "\n" + "\n".join(edges)
+        
+        
 class CodeEvaluator:
     def __init__(self, debugger):
         self.debugger = debugger
@@ -150,6 +222,7 @@ class WebDebugger(bdb.Bdb):
         self.evaluator = CodeEvaluator(self)
         self.selected_code = None
         self.selected_range = None
+        self.execution_tracker = ExecutionTracker()
 
     def user_line(self, frame):
         with self._lock:
@@ -157,6 +230,13 @@ class WebDebugger(bdb.Bdb):
             self.current_line = frame.f_lineno
             self.stack_frames = self._get_stack_frames()
             self.variables = self._get_variables(frame)
+            
+            code = self._get_line_code(frame)
+            self.execution_tracker.add_execution_step(
+                frame.f_lineno, 
+                code,
+                'line'
+            )
             
             if not self.selected_range or (
                 self.current_line >= self.selected_range[0] and 
@@ -187,8 +267,31 @@ class WebDebugger(bdb.Bdb):
 
     def user_return(self, frame, return_value):
         with self._lock:
-            if self.step_over_depth and len(self._get_stack_frames()) < self.step_over_depth:
-                self.step_over_depth = None
+            if frame.f_code.co_name != '<module>':
+                self.execution_tracker.exit_function(frame.f_code.co_name)
+            super().user_return(frame, return_value)
+            
+    def user_call(self, frame, argument_list):
+        with self._lock:
+            if frame.f_code.co_name != '<module>':
+                self.execution_tracker.enter_function(
+                    frame.f_code.co_name,
+                    frame.f_lineno
+                )
+            
+    def _get_line_code(self, frame):
+        try:
+            lines, start = inspect.getsourcelines(frame.f_code)
+            return lines[frame.f_lineno - start]
+        except:
+            return ""
+            
+    def get_visualization_data(self):
+        """Get visualization data for frontend"""
+        return {
+            'execution_flowchart': self.execution_tracker.get_execution_flowchart(),
+            'call_graph': self.execution_tracker.get_call_graph()
+        }
 
     def user_exception(self, frame, exc_info):
         exc_type, exc_value, exc_traceback = exc_info
@@ -295,6 +398,18 @@ def run_code(code, debugger, start_line=None, end_line=None):
 @app.route("/")
 def index():
     return send_from_directory(current_app.static_folder, 'index.html')
+
+@app.route("/visualizations", methods=["GET"])
+def get_visualizations():
+    global debugger_instance
+    if not debugger_instance:
+        return jsonify({"error": "Debugger not running"}), 400
+        
+    try:
+        data = debugger_instance.get_visualization_data()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/evaluate", methods=["POST"])
 def evaluate_code():

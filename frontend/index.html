@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.0/mermaid.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -17,6 +18,87 @@
             background-color: #1e1e1e;
             color: #d4d4d4;
         }
+
+        .visualization-panel {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            width: 600px;
+            height: 80vh;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        
+        .visualization-header {
+            padding: 10px;
+            background: #1e1e1e;
+            border-bottom: 1px solid #3c3c3c;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .visualization-content {
+            flex: 1;
+            overflow: auto;
+            padding: 15px;
+        }
+        
+        .visualization-tabs {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+        
+        .visualization-tab {
+            padding: 5px 10px;
+            background: none;
+            border: none;
+            color: #d4d4d4;
+            cursor: pointer;
+        }
+        
+        .visualization-tab.active {
+            background: #0e639c;
+            border-radius: 4px;
+        }
+        
+        .diagram-container {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .diagram-container svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+        }
+        
+        .zoom-button {
+            padding: 5px 10px;
+            background: #0e639c;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
 
         .sidebar {
             width: 280px;
@@ -408,6 +490,24 @@
         </div>
         
     </div>
+    <div class="visualization-panel" id="visualizationPanel" style="display: none;">
+        <div class="visualization-header">
+            <span>Execution Visualizations</span>
+            <button class="close-button" onclick="toggleVisualizationPanel(false)">×</button>
+        </div>
+        <div class="visualization-tabs">
+            <button class="visualization-tab active" onclick="switchTab('flowchart')">Execution Flow</button>
+            <button class="visualization-tab" onclick="switchTab('callgraph')">Call Graph</button>
+        </div>
+        <div class="visualization-content">
+            <div class="diagram-container" id="diagramContainer"></div>
+        </div>
+        <div class="zoom-controls">
+            <button class="zoom-button" onclick="zoomDiagram(-0.1)">-</button>
+            <button class="zoom-button" onclick="zoomDiagram(0.1)">+</button>
+            <button class="zoom-button" onclick="resetZoom()">Reset</button>
+        </div>
+    </div>
     
     <div class="selection-controls" id="selectionControls">
         <button onclick="evaluateSelection()">Evaluate Selection</button>
@@ -436,6 +536,16 @@
     <div class="variable-tooltip" id="variableTooltip"></div>
 
     <script>
+
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            flowchart: {
+                curve: 'basis',
+                padding: 20
+            }
+        });
+
         let codeLines = [];
         let activeBreakpoints = new Set();
         let isDebugging = false;
@@ -445,8 +555,12 @@
         let selectedText = '';
         let selectionStart = 0;
         let selectionEnd = 0;
+        let currentTab = 'flowchart';
+        let currentZoom = 1;
+        let panningEnabled = false;
+        let lastX = 0;
+        let lastY = 0;
 
-        // DOM element references
         const codeArea = document.getElementById('codeArea');
         const output = document.getElementById('output');
         const variables = document.getElementById('variables');
@@ -456,11 +570,9 @@
         const stateCounter = document.getElementById('stateCounter');
         const debugButtons = ['stepButton', 'stepOverButton', 'stepBackButton', 'continueButton', 'stopButton', 'prevStateButton', 'nextStateButton'];
 
-        // Event listeners
         fileInput.addEventListener('change', handleFileSelect);
         document.addEventListener('mousemove', updateTooltipPosition);
 
-        // Variable tooltip functions
         function updateTooltipPosition(e) {
             if (variableTooltip.style.display === 'block') {
                 variableTooltip.style.left = (e.pageX + 10) + 'px';
@@ -477,7 +589,6 @@
             variableTooltip.style.display = 'none';
         }
 
-        // File handling
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file || !file.name.endsWith('.py')) {
@@ -495,7 +606,6 @@
             reader.readAsText(file);
         }
 
-        // Code area updates
         function updateCodeArea(code) {
             const highlighted = hljs.highlight(code, {language: 'python'}).value;
             codeArea.innerHTML = highlighted.split('\n').map((line, index) => `
@@ -666,7 +776,6 @@
             document.getElementById('evaluationPanel').style.display = show ? 'block' : 'none';
         }
 
-        // Debugger control functions
         async function startDebugger(startLine = null, endLine = null) {
             if (!codeLines.length) {
                 showError('Please load a Python file first');
@@ -814,7 +923,6 @@
             `).join('');
         }
 
-        // Communication with server
         async function sendControl(action) {
             try {
                 await fetch('/control', {
@@ -839,7 +947,6 @@
             }
         }
 
-        // Status polling
         function startPolling() {
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = setInterval(pollStatus, 300);
@@ -849,20 +956,109 @@
             if (!isDebugging) return;
 
             try {
-                const response = await fetch('/status');
-                if (!response.ok) throw new Error('Failed to get status');
+                const [statusResponse, visualResponse] = await Promise.all([
+                    fetch('/status'),
+                    fetch('/visualizations')
+                ]);
+        
+                if (!statusResponse.ok || !visualResponse.ok) 
+                    throw new Error('Failed to get data');
                 
-                const data = await response.json();
-                updateDebuggerState(data);
+                const statusData = await statusResponse.json();
+                const visualData = await visualResponse.json();
                 
-                if (!data.is_running || data.exception) {
+                updateDebuggerState(statusData);
+                updateVisualizations(visualData);
+                
+                if (!statusData.is_running || statusData.exception) {
                     stopDebugger();
                 }
             } catch (error) {
-                console.error('Error polling status:', error);
+                console.error('Error polling:', error);
                 stopDebugger();
             }
         }
+
+        function updateVisualizations(data) {
+            const container = document.getElementById('diagramContainer');
+            if (!container) return;
+        
+            const diagram = currentTab === 'flowchart' ? 
+                data.execution_flowchart : 
+                data.call_graph;
+        
+            mermaid.render('diagram', diagram).then(({svg}) => {
+                container.innerHTML = svg;
+                applyZoom();
+                setupPanning();
+            });
+        }
+
+        function toggleVisualizationPanel(show) {
+            document.getElementById('visualizationPanel').style.display = 
+                show ? 'flex' : 'none';
+        }
+        
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.visualization-tab').forEach(el => {
+                el.classList.toggle('active', el.textContent.toLowerCase().includes(tab));
+            });
+            pollStatus();
+        }
+        
+        function zoomDiagram(delta) {
+            currentZoom = Math.max(0.1, Math.min(2, currentZoom + delta));
+            applyZoom();
+        }
+        
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+        
+        function applyZoom() {
+            const svg = document.querySelector('#diagramContainer svg');
+            if (svg) {
+                svg.style.transform = `scale(${currentZoom})`;
+                svg.style.transformOrigin = 'center';
+            }
+        }
+        
+        function setupPanning() {
+            const container = document.getElementById('diagramContainer');
+            
+            container.addEventListener('mousedown', (e) => {
+                panningEnabled = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                container.style.cursor = 'grabbing';
+            });
+        
+            container.addEventListener('mousemove', (e) => {
+                if (!panningEnabled) return;
+                
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                
+                container.scrollLeft -= dx;
+                container.scrollTop -= dy;
+                
+                lastX = e.clientX;
+                lastY = e.clientY;
+            });
+        
+            container.addEventListener('mouseup', () => {
+                panningEnabled = false;
+                container.style.cursor = 'default';
+            });
+        
+            container.addEventListener('mouseleave', () => {
+                panningEnabled = false;
+                container.style.cursor = 'default';
+            });
+        }
+
 
         function updateDebuggerState(data) {
             const variablesDiv = document.getElementById('variables');
@@ -911,6 +1107,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeCodeSelection();
         });
+        document.querySelector('.control-group').insertAdjacentHTML('beforeend', `
+            <button onclick="toggleVisualizationPanel(true)">Show Visualizations</button>
+        `);
     </script>
 </body>
 </html>
