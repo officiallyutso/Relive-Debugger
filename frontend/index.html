@@ -256,6 +256,101 @@
             border-radius: 4px;
             font-size: 13px;
         }
+
+        .code-evaluation-panel {
+            position: fixed;
+            bottom: 0;
+            right: 20px;
+            width: 400px;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+        }
+
+        .code-evaluation-header {
+            padding: 10px;
+            background: #1e1e1e;
+            border-bottom: 1px solid #3c3c3c;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-evaluation-content {
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .code-evaluation-input {
+            width: 100%;
+            min-height: 60px;
+            background: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            color: #d4d4d4;
+            padding: 8px;
+            font-family: 'Consolas', monospace;
+            margin-bottom: 10px;
+            resize: vertical;
+        }
+
+        .evaluation-result {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: 'Consolas', monospace;
+        }
+
+        .side-effect {
+            color: #f9826c;
+            margin-top: 5px;
+            font-size: 0.9em;
+        }
+
+        .selection-controls {
+            position: absolute;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+            padding: 5px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .selection-info {
+            background: #0e639c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            color: #d4d4d4;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .close-button:hover {
+            color: white;
+        }
+
+        .selection-active {
+            background-color: #264f78 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -311,9 +406,35 @@
             <h3>Output</h3>
             <pre id="output" class="output-content"></pre>
         </div>
+        
+    </div>
+    
+    <div class="selection-controls" id="selectionControls">
+        <button onclick="evaluateSelection()">Evaluate Selection</button>
+        <button onclick="debugSelection()">Debug Selection</button>
     </div>
 
+    <div class="selection-info" id="selectionInfo">
+        Selection: Lines <span id="selectionStart">0</span> to <span id="selectionEnd">0</span>
+    </div>
+
+    <div class="code-evaluation-panel" id="evaluationPanel">
+        <div class="code-evaluation-header">
+            <span>Code Evaluation</span>
+            <button class="close-button" onclick="toggleEvaluationPanel(false)">×</button>
+        </div>
+        <div class="code-evaluation-content">
+            <textarea class="code-evaluation-input" id="evaluationInput" 
+                      placeholder="Enter Python code to evaluate..."></textarea>
+            <button onclick="evaluateCode()">Evaluate</button>
+            <div id="evaluationResults"></div>
+        </div>
+    </div>
+    
+    
+    
     <div class="variable-tooltip" id="variableTooltip"></div>
+
     <script>
         let codeLines = [];
         let activeBreakpoints = new Set();
@@ -321,6 +442,9 @@
         let pollInterval = null;
         let currentState = 0;
         let maxStates = 0;
+        let selectedText = '';
+        let selectionStart = 0;
+        let selectionEnd = 0;
 
         // DOM element references
         const codeArea = document.getElementById('codeArea');
@@ -393,8 +517,157 @@
             }
         }
 
+        function initializeCodeSelection() {
+            let isSelecting = false;
+            let startLine = 0;
+
+            codeArea.addEventListener('mousedown', (e) => {
+                const line = e.target.closest('.code-line');
+                if (line) {
+                    isSelecting = true;
+                    startLine = parseInt(line.dataset.line);
+                    clearSelection();
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isSelecting) return;
+                
+                const line = e.target.closest('.code-line');
+                if (line) {
+                    const currentLine = parseInt(line.dataset.line);
+                    updateSelection(startLine, currentLine);
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isSelecting) {
+                    isSelecting = false;
+                    showSelectionControls();
+                }
+            });
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.code-line').forEach(line => {
+                line.classList.remove('selection-active');
+            });
+            document.getElementById('selectionInfo').style.display = 'none';
+            document.getElementById('selectionControls').style.display = 'none';
+        }
+
+        function updateSelection(start, end) {
+            clearSelection();
+            const [lineStart, lineEnd] = start < end ? [start, end] : [end, start];
+            selectionStart = lineStart;
+            selectionEnd = lineEnd;
+            
+            document.querySelectorAll('.code-line').forEach(line => {
+                const lineNum = parseInt(line.dataset.line);
+                if (lineNum >= lineStart && lineNum <= lineEnd) {
+                    line.classList.add('selection-active');
+                }
+            });
+
+            selectedText = getSelectedCode(lineStart, lineEnd);
+            updateSelectionInfo();
+        }
+
+        function getSelectedCode(start, end) {
+            const lines = [];
+            document.querySelectorAll('.code-line').forEach(line => {
+                const lineNum = parseInt(line.dataset.line);
+                if (lineNum >= start && lineNum <= end) {
+                    lines.push(line.textContent);
+                }
+            });
+            return lines.join('\n');
+        }
+
+        function updateSelectionInfo() {
+            const info = document.getElementById('selectionInfo');
+            const startSpan = document.getElementById('selectionStart');
+            const endSpan = document.getElementById('selectionEnd');
+            
+            startSpan.textContent = selectionStart;
+            endSpan.textContent = selectionEnd;
+            info.style.display = 'block';
+        }
+
+        function showSelectionControls() {
+            const controls = document.getElementById('selectionControls');
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            controls.style.left = `${rect.left}px`;
+            controls.style.top = `${rect.bottom + 5}px`;
+            controls.style.display = 'block';
+        }
+
+        function evaluateSelection() {
+            const evaluationInput = document.getElementById('evaluationInput');
+            evaluationInput.value = selectedText;
+            toggleEvaluationPanel(true);
+        }
+
+        function debugSelection() {
+            startDebugger(selectionStart, selectionEnd);
+        }
+
+        async function evaluateCode() {
+            const code = document.getElementById('evaluationInput').value;
+            if (!code.trim()) return;
+
+            try {
+                const response = await fetch('/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        code,
+                        line_number: selectionStart
+                    })
+                });
+
+                const data = await response.json();
+                displayEvaluationResult(data);
+            } catch (error) {
+                showError(`Evaluation error: ${error.message}`);
+            }
+        }
+
+        function displayEvaluationResult(data) {
+            const resultsDiv = document.getElementById('evaluationResults');
+            let html = '<div class="evaluation-result">';
+            
+            if (data.error) {
+                html += `<div style="color: #f44;">Error: ${data.error}</div>`;
+            } else {
+                if (data.result !== null) {
+                    html += `<div>Result: ${data.result}</div>`;
+                }
+                if (data.output) {
+                    html += `<div>Output: ${data.output}</div>`;
+                }
+                if (data.side_effects && data.side_effects.length > 0) {
+                    html += '<div class="side-effect">Side Effects:';
+                    data.side_effects.forEach(effect => {
+                        html += `<div>• ${effect}</div>`;
+                    });
+                    html += '</div>';
+                }
+            }
+            html += '</div>';
+            
+            resultsDiv.innerHTML = html + resultsDiv.innerHTML;
+        }
+
+        function toggleEvaluationPanel(show) {
+            document.getElementById('evaluationPanel').style.display = show ? 'block' : 'none';
+        }
+
         // Debugger control functions
-        async function startDebugger() {
+        async function startDebugger(startLine = null, endLine = null) {
             if (!codeLines.length) {
                 showError('Please load a Python file first');
                 return;
@@ -404,7 +677,11 @@
                 const response = await fetch('/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: codeLines.join('\n') })
+                    body: JSON.stringify({ 
+                        code: codeLines.join('\n'),
+                        start_line: startLine,
+                        end_line: endLine
+                    })
                 });
 
                 if (!response.ok) throw new Error('Failed to start debugger');
@@ -631,6 +908,9 @@
                 frame.classList.toggle('active', i === index);
             });
         }
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCodeSelection();
+        });
     </script>
 </body>
 </html>

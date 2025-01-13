@@ -14,6 +14,7 @@ from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
 import json
 import copy
+import ast
 
 app = Flask(__name__, static_folder='frontend')
 debugger_instance = None
@@ -40,6 +41,92 @@ class OutputBuffer:
 
     def getvalue(self):
         return self.buffer.getvalue()
+    def clear(self):
+        self.buffer = StringIO()
+        
+class CodeEvaluator:
+    def __init__(self, debugger):
+        self.debugger = debugger
+        
+    def dedent_code(self, code):
+        """Remove common leading indentation from code."""
+        lines = code.splitlines()
+        content_lines = [line for line in lines if line.strip()]
+        if not content_lines:
+            return code
+            
+        min_indent = min(len(line) - len(line.lstrip()) for line in content_lines)
+        
+        dedented_lines = []
+        for line in lines:
+            if line.strip():  
+                dedented_lines.append(line[min_indent:])
+            else:
+                dedented_lines.append('')
+                
+        return '\n'.join(dedented_lines)
+        
+    def evaluate(self, code, line_number=None):
+        try:
+            dedented_code = self.dedent_code(code)
+            if self.debugger.current_frame:
+                local_vars = dict(self.debugger.current_frame.f_locals)
+                global_vars = dict(self.debugger.current_frame.f_globals)
+            else:
+                local_vars = {}
+                global_vars = {}
+            
+            self.debugger.output_buffer.clear()
+            
+            try:
+                tree = ast.parse(dedented_code, mode='eval')
+                result = eval(dedented_code, global_vars, local_vars)
+                return {
+                    'result': repr(result),
+                    'output': self.debugger.output_buffer.getvalue(),
+                    'type': 'expression',
+                    'side_effects': self.detect_side_effects(local_vars, global_vars)
+                }
+            except SyntaxError:
+                tree = ast.parse(dedented_code, mode='exec')
+                exec(dedented_code, global_vars, local_vars)
+                return {
+                    'result': None,
+                    'output': self.debugger.output_buffer.getvalue(),
+                    'type': 'statement',
+                    'side_effects': self.detect_side_effects(local_vars, global_vars)
+                }
+                
+        except Exception as e:
+            return {
+                'error': str(e),
+                'output': self.debugger.output_buffer.getvalue(),
+                'type': 'error'
+            }
+
+    def detect_side_effects(self, new_locals, new_globals):
+        side_effects = []
+        
+        if self.debugger.current_frame:
+            old_locals = self.debugger.current_frame.f_locals
+            old_globals = self.debugger.current_frame.f_globals
+            
+            for key in new_locals:
+                if key in old_locals:
+                    if new_locals[key] != old_locals[key]:
+                        side_effects.append(f"Modified local variable: {key}")
+                else:
+                    side_effects.append(f"New local variable: {key}")
+            
+            for key in new_globals:
+                if key in old_globals:
+                    if new_globals[key] != old_globals[key]:
+                        side_effects.append(f"Modified global variable: {key}")
+                else:
+                    side_effects.append(f"New global variable: {key}")
+                    
+        return side_effects
+
 
 class WebDebugger(bdb.Bdb):
     def __init__(self):
@@ -60,6 +147,9 @@ class WebDebugger(bdb.Bdb):
         self.program_states = []
         self.current_state_index = -1
         self.max_states = 100
+        self.evaluator = CodeEvaluator(self)
+        self.selected_code = None
+        self.selected_range = None
 
     def user_line(self, frame):
         with self._lock:
@@ -68,7 +158,12 @@ class WebDebugger(bdb.Bdb):
             self.stack_frames = self._get_stack_frames()
             self.variables = self._get_variables(frame)
             
-            self._save_state()
+            if not self.selected_range or (
+                self.current_line >= self.selected_range[0] and 
+                self.current_line <= self.selected_range[1]
+            ):
+            
+                self._save_state()
             
             while self.is_running and not self.next_command:
                 time.sleep(0.1)
@@ -87,6 +182,8 @@ class WebDebugger(bdb.Bdb):
                     self._restore_previous_state()
                 elif command == 'quit':
                     self.set_quit()
+    def evaluate_code(self, code, line_number=None):
+        return self.evaluator.evaluate(code, line_number)
 
     def user_return(self, frame, return_value):
         with self._lock:
@@ -170,11 +267,23 @@ class WebDebugger(bdb.Bdb):
             sys.stdout = self.stored_stdout
             sys.stderr = self.stored_stderr
 
-def run_code(code, debugger):
+def run_code(code, debugger, start_line=None, end_line=None):
     try:
         debugger.setup_io()
         debugger.is_running = True
-        compiled_code = compile(code, '<string>', 'exec')
+        
+        if start_line is not None and end_line is not None:
+            debugger.selected_range = (start_line, end_line)
+            # selected lines extract karne keliye
+            code_lines = code.split('\n')
+            selected_code = '\n'.join(code_lines[start_line-1:end_line])
+            debugger.selected_code = selected_code
+            compiled_code = compile(selected_code, '<string>', 'exec')
+        else:
+            debugger.selected_range = None
+            debugger.selected_code = None
+            compiled_code = compile(code, '<string>', 'exec')
+            
         debugger.run(compiled_code)
     except Exception as e:
         debugger.exception = str(e)
@@ -187,10 +296,28 @@ def run_code(code, debugger):
 def index():
     return send_from_directory(current_app.static_folder, 'index.html')
 
+@app.route("/evaluate", methods=["POST"])
+def evaluate_code():
+    global debugger_instance
+    if not debugger_instance:
+        return jsonify({"error": "Debugger not running"}), 400
+        
+    code = request.json.get("code")
+    line_number = request.json.get("line_number")
+    
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+        
+    result = debugger_instance.evaluate_code(code, line_number)
+    return jsonify(result)
+
 @app.route("/start", methods=["POST"])
 def start_debugger():
     global debugger_instance
     code = request.json.get("code")
+    start_line = request.json.get("start_line")
+    end_line = request.json.get("end_line")
+    
     if not code:
         return jsonify({"error": "No code provided"}), 400
 
@@ -201,7 +328,12 @@ def start_debugger():
         time.sleep(0.5)
 
     debugger_instance = WebDebugger()
-    threading.Thread(target=run_code, args=(code, debugger_instance), daemon=True).start()
+    threading.Thread(
+        target=run_code, 
+        args=(code, debugger_instance, start_line, end_line), 
+        daemon=True
+    ).start()
+    
     return jsonify({
         "message": "Debugger started",
         "highlighted_code": highlighted_code
