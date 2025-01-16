@@ -441,7 +441,6 @@ button:disabled {
     width: 100%;
 }
 
-/* Blur effect when editor is open */
 body.editor-open .main-content-wrapper {
     filter: blur(5px);
     pointer-events: none;
