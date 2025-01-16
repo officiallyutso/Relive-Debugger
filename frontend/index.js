@@ -1,139 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debugger GUI - ReLive Debugger</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.0/mermaid.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
-    <link rel="stylesheet" href="/frontend/index.css">
-    
-</head>
-<body>
-    <div class="sidebar">
-        <h2>ReLive Debugger</h2>
-        
-        <div class="control-group">
-            <label class="file-upload-label" for="fileInput">
-                Load File
-            </label>
-            <input type="file" id="fileInput" accept=".py" class="file-upload">
-            <button id="startButton" onclick="startDebugger()">Start Debugger</button>
-        </div>
-
-        <div class="control-group">
-            <button id="stepButton" onclick="step()" disabled>Step Into</button>
-            <button id="stepOverButton" onclick="stepOver()" disabled>Step Over</button>
-            <button id="stepBackButton" onclick="stepBack()" disabled>Step Back</button>
-            <button id="continueButton" onclick="continueExecution()" disabled>Continue</button>
-            <button id="stopButton" onclick="quitDebugger()" disabled>Stop</button>
-            
-            <div class="state-navigation">
-                <button id="prevStateButton" onclick="navigateState(-1)" disabled>◀</button>
-                <span id="stateCounter">State 0/0</span>
-                <button id="nextStateButton" onclick="navigateState(1)" disabled>▶</button>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <h3>Breakpoints</h3>
-            <div class="breakpoint-input">
-                <input type="number" id="breakpointLine" placeholder="Line number" min="1">
-                <button onclick="toggleBreakpoint()">Toggle</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="content">
-        <div class="code-area" id="codeArea"></div>
-        
-        <div class="debug-info">
-            <div class="variables-panel">
-                <h3 class="section-title">Variables</h3>
-                <div id="variables"></div>
-            </div>
-            <div class="stack-panel">
-                <h3 class="section-title">Call Stack</h3>
-                <div id="stackTrace"></div>
-            </div>
-        </div>
-        
-        <div class="output-panel">
-            <h3>Output</h3>
-            <pre id="output" class="output-content"></pre>
-        </div>
-        
-    </div>
-    <div class="visualization-panel" id="visualizationPanel" style="display: none;">
-        <div class="visualization-header">
-            <span>Execution Visualizations</span>
-            <button class="close-button" onclick="toggleVisualizationPanel(false)">×</button>
-        </div>
-        <div class="visualization-tabs">
-            <button class="visualization-tab active" onclick="switchTab('flowchart')">Execution Flow</button>
-            <button class="visualization-tab" onclick="switchTab('callgraph')">Call Graph</button>
-        </div>
-        <div class="visualization-content">
-            <div class="diagram-container" id="diagramContainer"></div>
-        </div>
-        <div class="zoom-controls">
-            <button class="zoom-button" onclick="zoomDiagram(-0.1)">-</button>
-            <button class="zoom-button" onclick="zoomDiagram(0.1)">+</button>
-            <button class="zoom-button" onclick="resetZoom()">Reset</button>
-        </div>
-    </div>
-    
-    <div class="selection-controls" id="selectionControls">
-        <button onclick="evaluateSelection()">Evaluate Selection</button>
-        <button onclick="debugSelection()">Debug Selection</button>
-    </div>
-
-    <div class="selection-info" id="selectionInfo">
-        Selection: Lines <span id="selectionStart">0</span> to <span id="selectionEnd">0</span>
-    </div>
-
-    <div class="code-evaluation-panel" id="evaluationPanel">
-        <div class="code-evaluation-header">
-            <span>Code Evaluation</span>
-            <button class="close-button" onclick="toggleEvaluationPanel(false)">×</button>
-        </div>
-        <div class="code-evaluation-content">
-            <textarea class="code-evaluation-input" id="evaluationInput" 
-                      placeholder="Enter Python code to evaluate..."></textarea>
-            <button onclick="evaluateCode()">Evaluate</button>
-            <div id="evaluationResults"></div>
-        </div>
-    </div>
-
-    <div id="editorPanel" class="editor-panel">
-        <div class="editor-header">
-            <span>Code Editor</span>
-            <button class="close-button" onclick="toggleEditor(false)">×</button>
-        </div>
-        <textarea id="codeEditor" class="code-editor" 
-                  placeholder="# Write your Python code here" 
-                  spellcheck="false"></textarea>
-        <div class="editor-controls">
-            <button onclick="debugEditorCode()">Debug Code</button>
-        </div>
-    </div>
-    
-    <button id="editorButton" class="editor-toggle-button" onclick="toggleEditor(true)">
-        <span>📝</span>
-    </button>
-    
-    
-    
-    <div class="variable-tooltip" id="variableTooltip"></div>
-
-    <script>
-
-        mermaid.initialize({
+mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
             flowchart: {
@@ -319,26 +184,6 @@
 
         function debugSelection() {
             startDebugger(selectionStart, selectionEnd);
-        }
-        function toggleEditor(show) {
-            const panel = document.getElementById('editorPanel');
-            panel.classList.toggle('open', show);
-        }
-        function debugEditorCode() {
-            const code = document.getElementById('codeEditor').value;
-            if (!code.trim()) {
-                showError('Please write some code first');
-                return;
-            }
-            
-            // Update codeLines for the editor code
-            codeLines = code.split('\n');
-            
-            // Close the editor panel
-            toggleEditor(false);
-            
-            // Start debugging
-            startDebugger();
         }
 
         async function evaluateCode() {
@@ -720,17 +565,9 @@
                 frame.classList.toggle('active', i === index);
             });
         }
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                toggleEditor(false);
-            }
-        });
         document.addEventListener('DOMContentLoaded', () => {
             initializeCodeSelection();
         });
         document.querySelector('.control-group').insertAdjacentHTML('beforeend', `
             <button onclick="toggleVisualizationPanel(true)">Show Visualizations</button>
         `);
-    </script>
-</body>
-</html>
