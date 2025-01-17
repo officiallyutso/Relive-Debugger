@@ -54,38 +54,50 @@ class ExecutionTracker:
         
     def add_execution_step(self, line_no, code, event_type):
         """Track a single execution step"""
+        # Clean and escape the code for Mermaid compatibility
+        clean_code = code.strip().replace('"', '\'').replace('\n', ' ')
+        if len(clean_code) > 30:
+            clean_code = clean_code[:27] + '...'
+            
         self.execution_path.append({
             'line': line_no,
-            'code': code.strip() if code else '',
+            'code': clean_code,
             'event': event_type,
             'timestamp': time.time(),
             'call_depth': len(self.current_calls)
         })
-    
-    def add_function_call(self, caller_line, caller_func, callee_func):
-        """Track function call relationships"""
-        if caller_func not in self.call_graph:
-            self.call_graph[caller_func] = {'calls': set(), 'called_from': set()}
-        
-        if callee_func not in self.call_graph:
-            self.call_graph[callee_func] = {'calls': set(), 'called_from': set()}
+
+    def add_function_call(self, caller_name, callee_name):
+        """Track a function call relationship"""
+        # Initialize caller in call graph if not exists
+        if caller_name not in self.call_graph:
+            self.call_graph[caller_name] = {
+                'calls': set(),
+                'called_from': set()
+            }
             
-        self.call_graph[caller_func]['calls'].add(callee_func)
-        self.call_graph[callee_func]['called_from'].add(caller_func)
-        
-    def enter_function(self, func_name, line_no):
-        """Track entering a function"""
-        if self.current_calls:
-            self.add_function_call(line_no, self.current_calls[-1], func_name)
-        self.current_calls.append(func_name)
-        
-    def exit_function(self, func_name):
-        """Track exiting a function"""
-        if self.current_calls and self.current_calls[-1] == func_name:
+        # Initialize callee in call graph if not exists
+        if callee_name not in self.call_graph:
+            self.call_graph[callee_name] = {
+                'calls': set(),
+                'called_from': set()
+            }
+            
+        # Record the call relationship
+        self.call_graph[caller_name]['calls'].add(callee_name)
+        self.call_graph[callee_name]['called_from'].add(caller_name)
+        self.current_calls.append(callee_name)
+
+    def remove_function_call(self, callee_name):
+        """Remove the most recent call to the function"""
+        if self.current_calls and self.current_calls[-1] == callee_name:
             self.current_calls.pop()
-            
+    
     def get_execution_flowchart(self):
         """Generate Mermaid flowchart from execution path"""
+        if not self.execution_path:
+            return "flowchart TB\nstart[No execution steps yet]"
+            
         nodes = []
         edges = []
         node_ids = {}
@@ -93,9 +105,10 @@ class ExecutionTracker:
         
         for i, step in enumerate(self.execution_path):
             node_id = f"node{i}"
+            # Add tooltips using Mermaid click events
             label = f"{step['line']}: {step['code']}"
-            nodes.append(f"{node_id}[{label}]")
-            node_ids[step['line']] = node_id
+            nodes.append(f"{node_id}[\"{label}\"]")
+            nodes.append(f"click {node_id} callback \"Line {step['line']}<br/>Code: {step['code']}<br/>Event: {step['event']}\"")
             
             if last_node:
                 edges.append(f"{last_node} --> {node_id}")
@@ -105,17 +118,76 @@ class ExecutionTracker:
         
     def get_call_graph(self):
         """Generate Mermaid diagram for call graph"""
+        if not self.call_graph:
+            return "flowchart LR\nstart[No function calls yet]"
+            
         nodes = []
         edges = []
         
-        for func in self.call_graph:
-            nodes.append(f"{func}[{func}]")
-            for called in self.call_graph[func]['calls']:
-                edges.append(f"{func} --> {called}")
+        # Convert sets to lists for consistent ordering
+        for func in sorted(self.call_graph.keys()):
+            # Clean function name for Mermaid compatibility
+            clean_func = func.replace('<', '').replace('>', '').replace(' ', '_')
+            
+            # Add tooltips for function nodes
+            nodes.append(f"{clean_func}[\"{func}\"]")
+            calls = len(self.call_graph[func]['calls'])
+            called_by = len(self.call_graph[func]['called_from'])
+            nodes.append(f"click {clean_func} callback \"Function: {func}<br/>Calls: {calls}<br/>Called by: {called_by}\"")
+            
+            # Add edges for each function call
+            for called in sorted(self.call_graph[func]['calls']):
+                clean_called = called.replace('<', '').replace('>', '').replace(' ', '_')
+                edges.append(f"{clean_func} --> {clean_called}")
                 
         return "flowchart LR\n" + "\n".join(nodes) + "\n" + "\n".join(edges)
+
+class PerformanceProfiler:
+    def __init__(self):
+        self.function_times = {}
+        self.current_functions = {}
+        self._start_times = {}
         
+    def start_function(self, func_name, line_no):
+        """Start timing a function"""
+        timestamp = time.time()
+        self._start_times[func_name] = timestamp
         
+        if func_name not in self.function_times:
+            self.function_times[func_name] = {
+                'total_time': 0,
+                'calls': 0,
+                'avg_time': 0,
+                'last_call_time': 0,
+                'line': line_no
+            }
+            
+        self.function_times[func_name]['calls'] += 1
+        
+    def end_function(self, func_name):
+        """End timing a function"""
+        if func_name in self._start_times:
+            end_time = time.time()
+            elapsed = end_time - self._start_times[func_name]
+            
+            self.function_times[func_name]['total_time'] += elapsed
+            self.function_times[func_name]['last_call_time'] = elapsed
+            self.function_times[func_name]['avg_time'] = (
+                self.function_times[func_name]['total_time'] / 
+                self.function_times[func_name]['calls']
+            )
+            
+            del self._start_times[func_name]
+            
+    def get_profile_data(self):
+        """Get all profiling data"""
+        return {
+            'function_times': self.function_times,
+            'total_execution_time': sum(
+                data['total_time'] for data in self.function_times.values()
+            )
+        }
+
 class CodeEvaluator:
     def __init__(self, debugger):
         self.debugger = debugger
@@ -223,6 +295,7 @@ class WebDebugger(bdb.Bdb):
         self.selected_code = None
         self.selected_range = None
         self.execution_tracker = ExecutionTracker()
+        self.profiler = PerformanceProfiler()
 
     def user_line(self, frame):
         with self._lock:
@@ -268,16 +341,31 @@ class WebDebugger(bdb.Bdb):
     def user_return(self, frame, return_value):
         with self._lock:
             if frame.f_code.co_name != '<module>':
-                self.execution_tracker.exit_function(frame.f_code.co_name)
+                self.profiler.end_function(frame.f_code.co_name)
+                # Remove function from current calls stack
+                self.execution_tracker.remove_function_call(frame.f_code.co_name)
             super().user_return(frame, return_value)
+    def get_profile_data(self):
+        """Get profiling data for visualization"""
+        return self.profiler.get_profile_data()
             
     def user_call(self, frame, argument_list):
         with self._lock:
             if frame.f_code.co_name != '<module>':
-                self.execution_tracker.enter_function(
+                self.profiler.start_function(
                     frame.f_code.co_name,
                     frame.f_lineno
                 )
+                # Get caller name from previous frame if available
+                caller_name = '<module>'
+                if frame.f_back:
+                    caller_name = frame.f_back.f_code.co_name
+                # Add function call to execution tracker
+                self.execution_tracker.add_function_call(
+                    caller_name,
+                    frame.f_code.co_name
+                )
+            super().user_call(frame, argument_list)
             
     def _get_line_code(self, frame):
         try:
@@ -407,6 +495,18 @@ def get_visualizations():
         
     try:
         data = debugger_instance.get_visualization_data()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/profile", methods=["GET"])
+def get_profile_data():
+    global debugger_instance
+    if not debugger_instance:
+        return jsonify({"error": "Debugger not running"}), 400
+        
+    try:
+        data = debugger_instance.get_profile_data()
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

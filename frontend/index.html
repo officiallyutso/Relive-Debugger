@@ -131,15 +131,61 @@
     
     <div class="variable-tooltip" id="variableTooltip"></div>
 
+    <div class="profile-panel" id="profilePanel" style="display: none;">
+        <div class="profile-header">
+            <span>Performance Profile</span>
+            <button class="close-button" onclick="toggleProfilePanel(false)">×</button>
+        </div>
+        <div class="profile-content">
+            <div class="chart-container">
+                <canvas id="timeChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="callsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Chart.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+
+
     <script>
+        window.callback = function(nodeId) {
+            // Get the tooltip content from the data attributes
+            const tooltipContent = document.querySelector(`[id="${nodeId}"]`).getAttribute('title');
+            if (tooltipContent) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'mermaid-tooltip';
+                tooltip.innerHTML = tooltipContent;
+                document.body.appendChild(tooltip);
+                
+                // Position tooltip near mouse
+                document.addEventListener('mousemove', moveTooltip);
+                
+                function moveTooltip(e) {
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY + 10) + 'px';
+                }
+                
+                // Remove tooltip when mouse leaves the node
+                document.querySelector(`[id="${nodeId}"]`).addEventListener('mouseleave', () => {
+                    document.removeEventListener('mousemove', moveTooltip);
+                    tooltip.remove();
+                });
+            }
+        }
 
         mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
             flowchart: {
                 curve: 'basis',
-                padding: 20
-            }
+                padding: 20,
+                htmlLabels: true,
+                useMaxWidth: true
+            },
+            securityLevel: 'loose'  // Required for click events
         });
 
         let codeLines = [];
@@ -156,6 +202,8 @@
         let panningEnabled = false;
         let lastX = 0;
         let lastY = 0;
+        let timeChart = null;
+        let callsChart = null;
 
         const codeArea = document.getElementById('codeArea');
         const output = document.getElementById('output');
@@ -184,6 +232,165 @@
         function hideVariableTooltip() {
             variableTooltip.style.display = 'none';
         }
+        function toggleProfilePanel(show) {
+            const panel = document.getElementById('profilePanel');
+            const body = document.body;
+            
+            if (show) {
+                panel.style.display = 'flex';
+                // Force reflow
+                panel.offsetHeight;
+                panel.classList.add('visible');
+                body.classList.add('profile-open');
+                setTimeout(() => body.classList.add('fade-in'), 50);
+                updateProfileData();
+            } else {
+                panel.classList.remove('visible');
+                body.classList.remove('fade-in');
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                    body.classList.remove('profile-open');
+                }, 300);
+            }
+        }
+        async function updateProfileData() {
+            try {
+                const response = await fetch('/profile');
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                updateCharts(data);
+            } catch (error) {
+                showError('Error fetching profile data: ' + error.message);
+            }
+        }
+
+        function updateCharts(data) {
+            const functions = Object.keys(data.function_times);
+            const times = functions.map(f => data.function_times[f].total_time.toFixed(4));
+            const calls = functions.map(f => data.function_times[f].calls);
+            
+            // Shared chart options
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#d4d4d4'
+                        }
+                    },
+                    title: {
+                        color: '#d4d4d4',
+                        font: {
+                            size: 14
+                        }
+                    }
+                }
+            };
+            
+            // Time Chart
+            if (timeChart) timeChart.destroy();
+            timeChart = new Chart(document.getElementById('timeChart'), {
+                type: 'bar',
+                data: {
+                    labels: functions,
+                    datasets: [{
+                        label: 'Total Time (seconds)',
+                        data: times,
+                        backgroundColor: 'rgba(74, 144, 226, 0.5)',
+                        borderColor: 'rgba(74, 144, 226, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        title: {
+                            ...chartOptions.plugins.title,
+                            display: true,
+                            text: 'Function Execution Times'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#d4d4d4'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#d4d4d4'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Calls Chart
+            if (callsChart) callsChart.destroy();
+            callsChart = new Chart(document.getElementById('callsChart'), {
+                type: 'pie',
+                data: {
+                    labels: functions,
+                    datasets: [{
+                        data: calls,
+                        backgroundColor: [
+                            'rgba(74, 144, 226, 0.5)',
+                            'rgba(46, 204, 113, 0.5)',
+                            'rgba(230, 126, 34, 0.5)',
+                            'rgba(155, 89, 182, 0.5)',
+                            'rgba(241, 196, 15, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(74, 144, 226, 1)',
+                            'rgba(46, 204, 113, 1)',
+                            'rgba(230, 126, 34, 1)',
+                            'rgba(155, 89, 182, 1)',
+                            'rgba(241, 196, 15, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        title: {
+                            ...chartOptions.plugins.title,
+                            display: true,
+                            text: 'Function Call Distribution'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Add button to control group
+        document.querySelector('.control-group').insertAdjacentHTML('beforeend', `
+            <button onclick="toggleProfilePanel(true)">Show Profile</button>
+        `);
+
+        // Update profile data periodically when debugging
+        const originalPollStatus = pollStatus;
+        pollStatus = async function() {
+            await originalPollStatus();
+            if (document.getElementById('profilePanel').style.display === 'block') {
+                await updateProfileData();
+            }
+        };
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
@@ -322,7 +529,20 @@
         }
         function toggleEditor(show) {
             const panel = document.getElementById('editorPanel');
-            panel.classList.toggle('open', show);
+            const body = document.body;
+            
+            if (show) {
+                panel.classList.add('open');
+                body.classList.add('editor-open');
+                // Small delay to ensure smooth animation
+                setTimeout(() => body.classList.add('fade-in'), 50);
+            } else {
+                panel.classList.remove('open');
+                body.classList.remove('fade-in');
+                setTimeout(() => {
+                    body.classList.remove('editor-open');
+                }, 300);
+            }
         }
         function debugEditorCode() {
             const code = document.getElementById('codeEditor').value;
@@ -599,17 +819,51 @@
             const diagram = currentTab === 'flowchart' ? 
                 data.execution_flowchart : 
                 data.call_graph;
-        
-            mermaid.render('diagram', diagram).then(({svg}) => {
-                container.innerHTML = svg;
-                applyZoom();
-                setupPanning();
-            });
+                
+            // Clear previous diagram
+            container.innerHTML = '';
+            
+            if (diagram) {
+                mermaid.render('diagram', diagram)
+                    .then(({svg}) => {
+                        container.innerHTML = svg;
+                        applyZoom();
+                        setupPanning();
+                        
+                        // Add hover effects for nodes
+                        const nodes = container.querySelectorAll('.node');
+                        nodes.forEach(node => {
+                            node.addEventListener('mouseenter', () => {
+                                node.style.filter = 'brightness(1.2)';
+                            });
+                            node.addEventListener('mouseleave', () => {
+                                node.style.filter = '';
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Mermaid rendering error:', error);
+                        container.innerHTML = '<div class="error">Error rendering diagram</div>';
+                    });
+            }
         }
 
         function toggleVisualizationPanel(show) {
-            document.getElementById('visualizationPanel').style.display = 
-                show ? 'flex' : 'none';
+            const panel = document.getElementById('visualizationPanel');
+            
+            if (show) {
+                panel.style.display = 'flex';
+                // Force reflow
+                panel.offsetHeight;
+                // Add visible class to trigger the animation
+                panel.classList.add('visible');
+            } else {
+                panel.classList.remove('visible');
+                // Wait for animation to complete before hiding
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                }, 300); // Match the transition duration
+            }
         }
         
         function switchTab(tab) {

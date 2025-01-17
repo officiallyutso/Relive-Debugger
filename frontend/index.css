@@ -10,7 +10,7 @@ body {
 
 .visualization-panel {
     position: fixed;
-    right: 20px;
+    right: -600px; /* Start off-screen */
     top: 20px;
     width: 600px;
     height: 80vh;
@@ -21,6 +21,13 @@ body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
+    opacity: 0;
+    transition: all 0.3s ease-out;
+}
+
+.visualization-panel.visible {
+    right: 20px;
+    opacity: 1;
 }
 
 .visualization-header {
@@ -157,6 +164,66 @@ button:disabled {
     white-space: pre;
     min-height: 14px;
     line-height: 0.9;
+}
+.profile-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: 90%;
+    max-width: 1200px;
+    height: 80vh;
+    background: rgba(37, 37, 38, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: none;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.profile-panel.visible {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(30, 30, 30, 0.8);
+    border-radius: 12px 12px 0 0;
+}
+
+.profile-header span {
+    color: #ffffff;
+    font-size: 1.1em;
+    font-weight: 500;
+}
+
+.profile-content {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.chart-container {
+    flex: 1;
+    background: rgba(30, 30, 30, 0.6);
+    border-radius: 8px;
+    padding: 15px;
+    position: relative;
+    height: auto;
+    min-height: 300px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .code-line:hover {
@@ -591,4 +658,56 @@ body.editor-open::after {
 
 body.editor-open.fade-in::after {
     opacity: 1;
+}
+
+body.profile-open::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+body.profile-open.fade-in::after {
+    opacity: 1;
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+.mermaid-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+    max-width: 200px;
+    white-space: pre-wrap;
+}
+
+#diagramContainer svg {
+    width: 100%;
+    height: 100%;
+    transition: transform 0.2s;
+}
+
+.node:hover {
+    filter: brightness(1.2);
+    cursor: pointer;
+}
+
+.edgeLabel:hover {
+    filter: brightness(1.2);
 }
