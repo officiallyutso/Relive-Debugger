@@ -54,7 +54,6 @@ class ExecutionTracker:
         
     def add_execution_step(self, line_no, code, event_type):
         """Track a single execution step"""
-        # Clean and escape the code for Mermaid compatibility
         clean_code = code.strip().replace('"', '\'').replace('\n', ' ')
         if len(clean_code) > 30:
             clean_code = clean_code[:27] + '...'
@@ -69,21 +68,18 @@ class ExecutionTracker:
 
     def add_function_call(self, caller_name, callee_name):
         """Track a function call relationship"""
-        # Initialize caller in call graph if not exists
         if caller_name not in self.call_graph:
             self.call_graph[caller_name] = {
                 'calls': set(),
                 'called_from': set()
             }
             
-        # Initialize callee in call graph if not exists
         if callee_name not in self.call_graph:
             self.call_graph[callee_name] = {
                 'calls': set(),
                 'called_from': set()
             }
             
-        # Record the call relationship
         self.call_graph[caller_name]['calls'].add(callee_name)
         self.call_graph[callee_name]['called_from'].add(caller_name)
         self.current_calls.append(callee_name)
@@ -105,7 +101,6 @@ class ExecutionTracker:
         
         for i, step in enumerate(self.execution_path):
             node_id = f"node{i}"
-            # Add tooltips using Mermaid click events
             label = f"{step['line']}: {step['code']}"
             nodes.append(f"{node_id}[\"{label}\"]")
             nodes.append(f"click {node_id} callback \"Line {step['line']}<br/>Code: {step['code']}<br/>Event: {step['event']}\"")
@@ -124,18 +119,14 @@ class ExecutionTracker:
         nodes = []
         edges = []
         
-        # Convert sets to lists for consistent ordering
         for func in sorted(self.call_graph.keys()):
-            # Clean function name for Mermaid compatibility
             clean_func = func.replace('<', '').replace('>', '').replace(' ', '_')
             
-            # Add tooltips for function nodes
             nodes.append(f"{clean_func}[\"{func}\"]")
             calls = len(self.call_graph[func]['calls'])
             called_by = len(self.call_graph[func]['called_from'])
             nodes.append(f"click {clean_func} callback \"Function: {func}<br/>Calls: {calls}<br/>Called by: {called_by}\"")
             
-            # Add edges for each function call
             for called in sorted(self.call_graph[func]['calls']):
                 clean_called = called.replace('<', '').replace('>', '').replace(' ', '_')
                 edges.append(f"{clean_func} --> {clean_called}")
@@ -342,7 +333,6 @@ class WebDebugger(bdb.Bdb):
         with self._lock:
             if frame.f_code.co_name != '<module>':
                 self.profiler.end_function(frame.f_code.co_name)
-                # Remove function from current calls stack
                 self.execution_tracker.remove_function_call(frame.f_code.co_name)
             super().user_return(frame, return_value)
     def get_profile_data(self):
@@ -356,11 +346,9 @@ class WebDebugger(bdb.Bdb):
                     frame.f_code.co_name,
                     frame.f_lineno
                 )
-                # Get caller name from previous frame if available
                 caller_name = '<module>'
                 if frame.f_back:
                     caller_name = frame.f_back.f_code.co_name
-                # Add function call to execution tracker
                 self.execution_tracker.add_function_call(
                     caller_name,
                     frame.f_code.co_name
@@ -465,7 +453,6 @@ def run_code(code, debugger, start_line=None, end_line=None):
         
         if start_line is not None and end_line is not None:
             debugger.selected_range = (start_line, end_line)
-            # selected lines extract karne keliye
             code_lines = code.split('\n')
             selected_code = '\n'.join(code_lines[start_line-1:end_line])
             debugger.selected_code = selected_code

@@ -146,13 +146,11 @@
         </div>
     </div>
 
-    <!-- Add Chart.js library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 
 
     <script>
         window.callback = function(nodeId) {
-            // Get the tooltip content from the data attributes
             const tooltipContent = document.querySelector(`[id="${nodeId}"]`).getAttribute('title');
             if (tooltipContent) {
                 const tooltip = document.createElement('div');
@@ -160,7 +158,6 @@
                 tooltip.innerHTML = tooltipContent;
                 document.body.appendChild(tooltip);
                 
-                // Position tooltip near mouse
                 document.addEventListener('mousemove', moveTooltip);
                 
                 function moveTooltip(e) {
@@ -168,7 +165,6 @@
                     tooltip.style.top = (e.pageY + 10) + 'px';
                 }
                 
-                // Remove tooltip when mouse leaves the node
                 document.querySelector(`[id="${nodeId}"]`).addEventListener('mouseleave', () => {
                     document.removeEventListener('mousemove', moveTooltip);
                     tooltip.remove();
@@ -185,7 +181,7 @@
                 htmlLabels: true,
                 useMaxWidth: true
             },
-            securityLevel: 'loose'  // Required for click events
+            securityLevel: 'loose'
         });
 
         let codeLines = [];
@@ -238,7 +234,6 @@
             
             if (show) {
                 panel.style.display = 'flex';
-                // Force reflow
                 panel.offsetHeight;
                 panel.classList.add('visible');
                 body.classList.add('profile-open');
@@ -274,7 +269,6 @@
             const times = functions.map(f => data.function_times[f].total_time.toFixed(4));
             const calls = functions.map(f => data.function_times[f].calls);
             
-            // Shared chart options
             const chartOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -293,7 +287,6 @@
                 }
             };
             
-            // Time Chart
             if (timeChart) timeChart.destroy();
             timeChart = new Chart(document.getElementById('timeChart'), {
                 type: 'bar',
@@ -339,7 +332,6 @@
                 }
             });
             
-            // Calls Chart
             if (callsChart) callsChart.destroy();
             callsChart = new Chart(document.getElementById('callsChart'), {
                 type: 'pie',
@@ -378,12 +370,10 @@
             });
         }
 
-        // Add button to control group
         document.querySelector('.control-group').insertAdjacentHTML('beforeend', `
             <button onclick="toggleProfilePanel(true)">Show Profile</button>
         `);
 
-        // Update profile data periodically when debugging
         const originalPollStatus = pollStatus;
         pollStatus = async function() {
             await originalPollStatus();
@@ -534,7 +524,6 @@
             if (show) {
                 panel.classList.add('open');
                 body.classList.add('editor-open');
-                // Small delay to ensure smooth animation
                 setTimeout(() => body.classList.add('fade-in'), 50);
             } else {
                 panel.classList.remove('open');
@@ -820,7 +809,6 @@
                 data.execution_flowchart : 
                 data.call_graph;
                 
-            // Clear previous diagram
             container.innerHTML = '';
             
             if (diagram) {
@@ -830,7 +818,6 @@
                         applyZoom();
                         setupPanning();
                         
-                        // Add hover effects for nodes
                         const nodes = container.querySelectorAll('.node');
                         nodes.forEach(node => {
                             node.addEventListener('mouseenter', () => {
@@ -853,16 +840,13 @@
             
             if (show) {
                 panel.style.display = 'flex';
-                // Force reflow
                 panel.offsetHeight;
-                // Add visible class to trigger the animation
                 panel.classList.add('visible');
             } else {
                 panel.classList.remove('visible');
-                // Wait for animation to complete before hiding
                 setTimeout(() => {
                     panel.style.display = 'none';
-                }, 300); // Match the transition duration
+                }, 300);
             }
         }
         

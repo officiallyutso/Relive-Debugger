@@ -10,7 +10,7 @@ body {
 
 .visualization-panel {
     position: fixed;
-    right: -600px; /* Start off-screen */
+    right: -600px; /* main screen ke liye */
     top: 20px;
     width: 600px;
     height: 80vh;
