@@ -711,3 +711,95 @@ canvas {
 .edgeLabel:hover {
     filter: brightness(1.2);
 }
+
+.code-area::-webkit-scrollbar,
+.variables-panel::-webkit-scrollbar,
+.stack-panel::-webkit-scrollbar,
+.output-panel::-webkit-scrollbar,
+.visualization-content::-webkit-scrollbar,
+.code-evaluation-content::-webkit-scrollbar,
+.code-editor::-webkit-scrollbar,
+.profile-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.code-area::-webkit-scrollbar-track,
+.variables-panel::-webkit-scrollbar-track,
+.stack-panel::-webkit-scrollbar-track,
+.output-panel::-webkit-scrollbar-track,
+.visualization-content::-webkit-scrollbar-track,
+.code-evaluation-content::-webkit-scrollbar-track,
+.code-editor::-webkit-scrollbar-track,
+.profile-content::-webkit-scrollbar-track {
+    background: #1e1e1e;
+    border-radius: 4px;
+}
+
+.code-area::-webkit-scrollbar-thumb,
+.variables-panel::-webkit-scrollbar-thumb,
+.stack-panel::-webkit-scrollbar-thumb,
+.output-panel::-webkit-scrollbar-thumb,
+.visualization-content::-webkit-scrollbar-thumb,
+.code-evaluation-content::-webkit-scrollbar-thumb,
+.code-editor::-webkit-scrollbar-thumb,
+.profile-content::-webkit-scrollbar-thumb {
+    background: #3c3c3c;
+    border-radius: 4px;
+}
+
+.code-area::-webkit-scrollbar-thumb:hover,
+.variables-panel::-webkit-scrollbar-thumb:hover,
+.stack-panel::-webkit-scrollbar-thumb:hover,
+.output-panel::-webkit-scrollbar-thumb:hover,
+.visualization-content::-webkit-scrollbar-thumb:hover,
+.code-evaluation-content::-webkit-scrollbar-thumb:hover,
+.code-editor::-webkit-scrollbar-thumb:hover,
+.profile-content::-webkit-scrollbar-thumb:hover {
+    background: #505050;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #3c3c3c #1e1e1e;
+}
+
+@supports (-ms-overflow-style: none) {
+    .code-area,
+    .variables-panel,
+    .stack-panel,
+    .output-panel,
+    .visualization-content,
+    .code-evaluation-content,
+    .code-editor,
+    .profile-content {
+        -ms-overflow-style: -ms-autohiding-scrollbar;
+    }
+}
+
+@supports (-ms-ime-align: auto) {
+    .code-area,
+    .variables-panel,
+    .stack-panel,
+    .output-panel,
+    .visualization-content,
+    .code-evaluation-content,
+    .code-editor,
+    .profile-content {
+        scrollbar-width: thin;
+        scrollbar-color: #3c3c3c #1e1e1e;
+    }
+}
+
+.variable-value {
+    -ms-overflow-style: none;
+    scrollbar-width: none; 
+}
+.variable-value::-webkit-scrollbar {
+    display: none;
+}
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+    .variable-value {
+        -ms-overflow-style: none;
+    }
+}
