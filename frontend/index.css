@@ -125,6 +125,7 @@ h2, h3 {
     gap: 8px;
     padding: 15px 0;
     border-bottom: 1px solid #3c3c3c;
+    position: relative;
 }
 
 button {
@@ -355,17 +356,34 @@ button:disabled {
 
 .breakpoint-input {
     display: flex;
+    flex-direction: column;
     gap: 8px;
+    margin-bottom: 8px;
 }
 
 .breakpoint-input input {
-    flex: 1;
     padding: 4px 8px;
     background: #3c3c3c;
     border: 1px solid #555;
     color: #fff;
     border-radius: 4px;
+    width: 100%;
 }
+
+.breakpoint-input button {
+    align-self: flex-start;
+}
+
+.breakpoint-line-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.breakpoint-line-container input {
+    width: 100px;
+}
+
 .file-upload {
     display: none;
 }
@@ -405,7 +423,7 @@ button:disabled {
     border-bottom: none;
     border-radius: 8px 8px 0 0;
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    z-index: 1000;
+    z-index: 999;
     display: none;
 }
 
@@ -470,6 +488,7 @@ button:disabled {
     bottom: 20px;
     left: 20px;
     display: none;
+    margin-top: 8px;
     z-index: 1000;
 }
 
@@ -610,7 +629,7 @@ body.editor-open .main-content-wrapper {
 }
 .editor-toggle-button {
     position: fixed;
-    left: 20px;
+    right: 20px;
     bottom: 20px;
     width: 56px;
     height: 56px;
@@ -623,7 +642,7 @@ body.editor-open .main-content-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 998;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -802,4 +821,87 @@ canvas {
     .variable-value {
         -ms-overflow-style: none;
     }
+}
+
+.breakpoint {
+    background-color: rgba(255, 0, 0, 0.1);
+    position: relative;
+}
+
+.conditional-breakpoint {
+    background-color: rgba(255, 165, 0, 0.15);
+    border-left: 3px solid orange;
+}
+
+.conditional-indicator {
+    position: absolute;
+    left: -20px;
+    color: orange;
+    cursor: help;
+}
+
+.conditional-breakpoint::before {
+    content: "?";
+    position: absolute;
+    left: -20px;
+    color: #ffd700;
+}
+
+
+.breakpoint-list {
+    margin-top: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    border-top: 1px solid #3c3c3c;
+    padding-top: 8px;
+}
+
+.breakpoint-item {
+    display: flex;
+    margin: 5px 0;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    margin: 2px 0;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+}
+
+.breakpoint-item .condition {
+    font-size: 0.9em;
+    color: #ffa500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 10px;
+    overflow: hidden;
+    font-style: italic;
+    text-overflow: ellipsis;
+}
+.breakpoint-item button {
+    padding: 2px 6px;
+    background: #444;
+    border: none;
+    border-radius: 3px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.condition-icon {
+    color: orange;
+    font-size: 1.1em;
+}
+
+.remove-breakpoint {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #ff4444;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.remove-breakpoint:hover {
+    background: rgba(255, 68, 68, 0.1);
 }

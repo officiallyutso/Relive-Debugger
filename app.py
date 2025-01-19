@@ -275,7 +275,7 @@ class WebDebugger(bdb.Bdb):
         self.step_over_depth = None
         self.is_running = False
         self._lock = threading.Lock()
-        self.stored_stdout = None
+        self.stored_stdout = None   
         self.stored_stderr = None
         self.next_command = None
         self.current_line = None
@@ -287,6 +287,78 @@ class WebDebugger(bdb.Bdb):
         self.selected_range = None
         self.execution_tracker = ExecutionTracker()
         self.profiler = PerformanceProfiler()
+        self.conditional_breakpoints = {}
+        
+    def break_here(self, frame):
+        filename = frame.f_code.co_filename
+        lineno = frame.f_lineno
+
+        # First check if there's a breakpoint at this line
+        if not super().break_here(frame):
+            return False
+
+        # If there's a condition, evaluate it
+        if filename in self.conditional_breakpoints and lineno in self.conditional_breakpoints[filename]:
+            condition = self.conditional_breakpoints[filename][lineno]
+            try:
+                # Evaluate condition in the current frame's context
+                result = eval(condition, frame.f_globals, frame.f_locals)
+                return bool(result)
+            except Exception as e:
+                print(f"Error evaluating breakpoint condition: {e}")
+                return True  # Break anyway if condition evaluation fails
+        
+        return True
+    
+    def get_break_info(self, filename, lineno):
+        """Get information about a specific breakpoint."""
+        if self.get_break(filename, lineno):
+            condition = None
+            if (filename in self.conditional_breakpoints and 
+                lineno in self.conditional_breakpoints[filename]):
+                condition = self.conditional_breakpoints[filename][lineno]
+            return {
+                'line': lineno,
+                'condition': condition
+            }
+        return None
+    
+    def set_conditional_break(self, filename, lineno, condition=None):
+        """Set a breakpoint with an optional condition."""
+        self.set_break(filename, lineno)
+        
+        if condition:
+            if filename not in self.conditional_breakpoints:
+                self.conditional_breakpoints[filename] = {}
+            self.conditional_breakpoints[filename][lineno] = condition
+        elif filename in self.conditional_breakpoints:
+            # Remove condition if setting a regular breakpoint
+            self.conditional_breakpoints[filename].pop(lineno, None)
+
+    def clear_conditional_break(self, filename, lineno):
+        """Clear a conditional breakpoint."""
+        self.clear_break(filename, lineno)
+        if filename in self.conditional_breakpoints:
+            self.conditional_breakpoints[filename].pop(lineno, None)
+            
+    def clear_break(self, filename, lineno):
+        """Clear both the breakpoint and any associated condition."""
+        super().clear_break(filename, lineno)
+        if filename in self.conditional_breakpoints:
+            self.conditional_breakpoints[filename].pop(lineno, None)
+
+    def get_all_breakpoints(self):
+        """Get all breakpoints including their conditions."""
+        result = {}
+        for filename, lines in self.breakpoints.items():
+            result[filename] = {}
+            for lineno in lines:
+                condition = None
+                if (filename in self.conditional_breakpoints and 
+                    lineno in self.conditional_breakpoints[filename]):
+                    condition = self.conditional_breakpoints[filename][lineno]
+                result[filename][lineno] = {'condition': condition}
+        return result
 
     def user_line(self, frame):
         with self._lock:
@@ -570,13 +642,25 @@ def set_breakpoints():
     debugger_instance.clear_all_breaks()
     
     for bp in breakpoints:
-        line = int(bp)
-        debugger_instance.set_break('<string>', line)
+        line = bp.get('line') if isinstance(bp, dict) else bp
+        condition = bp.get('condition') if isinstance(bp, dict) else None
+        
+        if condition:
+            debugger_instance.set_conditional_break('<string>', line, condition)
+        else:
+            debugger_instance.set_break('<string>', line)
     
-    return jsonify({
-        "message": "Breakpoints set",
-        "breakpoints": list(debugger_instance.breakpoints.get('<string>', {}).keys())
-    })
+    return jsonify({"message": "Breakpoints set"})
+
+# Add a new route to get breakpoint information
+@app.route("/breakpoints", methods=["GET"])
+def get_breakpoints():
+    global debugger_instance
+    if not debugger_instance:
+        return jsonify({"error": "Debugger not running"}), 400
+    
+    return jsonify(debugger_instance.get_all_breakpoints())
+
 
 @app.route("/control", methods=["POST"])
 def control_execution():
