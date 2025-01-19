@@ -173,17 +173,19 @@ button:disabled {
     transform: translate(-50%, -50%) scale(0.95);
     width: 90%;
     max-width: 1200px;
-    height: 80vh;
-    background: rgba(37, 37, 38, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    height: 85vh;
+    background: rgba(28, 28, 28, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    border: 1px solid rgba(74, 144, 226, 0.15);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        0 0 100px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     display: none;
     opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .profile-panel.visible {
     transform: translate(-50%, -50%) scale(1);
@@ -193,20 +195,29 @@ button:disabled {
 }
 
 .profile-header {
-    padding: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1.5rem 2rem;
+    background: rgba(24, 24, 24, 0.95);
+    border-bottom: 1px solid rgba(74, 144, 226, 0.15);
+    border-radius: 16px 16px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(30, 30, 30, 0.8);
-    border-radius: 12px 12px 0 0;
 }
 
 .profile-header span {
     color: #ffffff;
-    font-size: 1.1em;
+    font-size: 1.25rem;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
+
+.profile-header span::before {
+    content: "";
+    font-size: 1.4rem;
+}
+
 
 .profile-content {
     flex: 1;
@@ -226,6 +237,17 @@ button:disabled {
     min-height: 300px;
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
+.chart-containers {
+    flex: 1;
+    background: rgba(30, 30, 30, 0.6);
+    border-radius: 8px;
+    padding: 15px;
+    position: relative;
+    height: auto;
+    min-height: 450px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 
 .code-line:hover {
     background-color: #2d2d2d;
