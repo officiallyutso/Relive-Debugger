@@ -15,6 +15,10 @@ from pygments.formatters import HtmlFormatter
 import json
 import copy
 import ast
+import psutil
+import time
+import threading
+from collections import deque
 
 app = Flask(__name__, static_folder='frontend')
 debugger_instance = None
@@ -261,6 +265,62 @@ class CodeEvaluator:
                     side_effects.append(f"New global variable: {key}")
                     
         return side_effects
+
+class ResourceMonitor:
+    def __init__(self):
+        self.cpu_percent = 0
+        self.io_counters = psutil.disk_io_counters()
+        self.net_counters = psutil.net_io_counters()
+        self.last_io_time = time.time()
+        self.last_net_time = time.time()
+        self.io_ops = 0
+        self.net_bytes = 0
+        self._lock = threading.Lock()
+        
+    def update(self):
+        with self._lock:
+            self.cpu_percent = psutil.cpu_percent()
+            
+            current_io = psutil.disk_io_counters()
+            io_time = time.time()
+            io_interval = io_time - self.last_io_time
+            
+            if io_interval > 0:
+                read_ops = current_io.read_count - self.io_counters.read_count
+                write_ops = current_io.write_count - self.io_counters.write_count
+                self.io_ops = (read_ops + write_ops) / io_interval
+                
+            self.io_counters = current_io
+            self.last_io_time = io_time
+            
+            current_net = psutil.net_io_counters()
+            net_time = time.time()
+            net_interval = net_time - self.last_net_time
+            
+            if net_interval > 0:
+                bytes_sent = current_net.bytes_sent - self.net_counters.bytes_sent
+                bytes_recv = current_net.bytes_recv - self.net_counters.bytes_recv
+                self.net_bytes = (bytes_sent + bytes_recv) / net_interval
+                
+            self.net_counters = current_net
+            self.last_net_time = net_time
+            
+    def get_usage(self):
+        with self._lock:
+            return {
+                'cpu': self.cpu_percent,
+                'io': round(self.io_ops, 1),
+                'network': round(self.net_bytes, 1)
+            }
+
+resource_monitor = None
+
+def update_resource_monitor():
+    global resource_monitor
+    while True:
+        if resource_monitor:
+            resource_monitor.update()
+        time.sleep(1)
 
 
 class WebDebugger(bdb.Bdb):
@@ -569,6 +629,13 @@ def get_profile_data():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/resource_usage", methods=["GET"])
+def get_resource_usage():
+    global resource_monitor
+    if not resource_monitor:
+        return jsonify({"error": "Resource monitor not running"}), 400
+    return jsonify(resource_monitor.get_usage())
 
 @app.route("/evaluate", methods=["POST"])
 def evaluate_code():
@@ -587,7 +654,7 @@ def evaluate_code():
 
 @app.route("/start", methods=["POST"])
 def start_debugger():
-    global debugger_instance
+    global debugger_instance, resource_monitor
     code = request.json.get("code")
     start_line = request.json.get("start_line")
     end_line = request.json.get("end_line")
@@ -602,6 +669,8 @@ def start_debugger():
         time.sleep(0.5)
 
     debugger_instance = WebDebugger()
+    resource_monitor = ResourceMonitor()
+    
     threading.Thread(
         target=run_code, 
         args=(code, debugger_instance, start_line, end_line), 
@@ -676,6 +745,9 @@ def control_execution():
     
     debugger_instance.next_command = action
     return jsonify({"message": f"Action '{action}' performed"})
+
+
+threading.Thread(target=update_resource_monitor, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True, port=5000)

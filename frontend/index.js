@@ -977,3 +977,541 @@ document.querySelector('.control-group').insertAdjacentHTML('beforeend', `
     <button onclick="toggleVisualizationPanel(true)">Show Visualizations</button>
 `);
 
+function toggleResourceDetail(show) {
+    document.querySelector('.resource-detail').classList.toggle('show', show);
+    document.querySelector('.resource-overlay').classList.toggle('show', show);
+}
+
+let cpuChart, ioChart, networkChart;
+const chartOptions = {
+    responsive: true,
+    animation: false,
+    scales: {
+        y: {
+            beginAtZero: true
+        }
+    }
+};
+
+function initCharts() {
+    cpuChart = new Chart(document.getElementById('cpuChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU Usage (%)',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: chartOptions
+    });
+
+    ioChart = new Chart(document.getElementById('ioChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'I/O Operations/s',
+                data: [],
+                borderColor: 'rgb(153, 102, 255)',
+                tension: 0.1
+            }]
+        },
+        options: chartOptions
+    });
+
+    networkChart = new Chart(document.getElementById('networkChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Network Usage (B/s)',
+                data: [],
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1
+            }]
+        },
+        options: chartOptions
+    });
+}
+function updateResourceData() {
+    fetch('/resource_usage')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('cpuValue').textContent = `${data.cpu.toFixed(1)}%`;
+            document.getElementById('ioValue').textContent = `${data.io} ops/s`;
+            document.getElementById('networkValue').textContent = `${formatBytes(data.network)}/s`;
+
+            updateChart(cpuChart, data.cpu);
+            updateChart(ioChart, data.io);
+            updateChart(networkChart, data.network);
+        });
+}
+
+function updateChart(chart, value) {
+    const now = new Date().toLocaleTimeString();
+    chart.data.labels.push(now);
+    chart.data.datasets[0].data.push(value);
+
+    if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+    }
+
+    chart.update();
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
+    setInterval(updateResourceData, 1000);
+});
+
+
+
+const chartConfig = {
+    cpu: {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'User CPU',
+                borderColor: '#4a90e2',
+                backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                data: [],
+                fill: true
+            }, {
+                label: 'System CPU',
+                borderColor: '#ff6b6b',
+                backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                data: [],
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#d4d4d4',
+                        padding: 10,
+                        font: {
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(28, 28, 28, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    titleColor: '#fff',
+                    bodyColor: '#d4d4d4',
+                    padding: 12,
+                    boxPadding: 6
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888',
+                        callback: value => `${value}%`
+                    }
+                }
+            }
+        }
+    },
+    memory: {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Used Memory',
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                data: [],
+                fill: true
+            }, {
+                label: 'Cache',
+                borderColor: '#ff9800',
+                backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                data: [],
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#d4d4d4',
+                        padding: 10,
+                        font: {
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(28, 28, 28, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    titleColor: '#fff',
+                    bodyColor: '#d4d4d4',
+                    padding: 12,
+                    boxPadding: 6
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888',
+                        callback: value => `${formatBytes(value)}`
+                    }
+                }
+            }
+        }
+    },
+    io: {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Read Operations',
+                backgroundColor: 'rgba(74, 144, 226, 0.5)',
+                borderColor: '#4a90e2',
+                data: [],
+                borderWidth: 1
+            }, {
+                label: 'Write Operations',
+                backgroundColor: 'rgba(255, 107, 107, 0.5)',
+                borderColor: '#ff6b6b',
+                data: [],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#d4d4d4',
+                        padding: 10,
+                        font: {
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(28, 28, 28, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    titleColor: '#fff',
+                    bodyColor: '#d4d4d4',
+                    padding: 12,
+                    boxPadding: 6
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888',
+                        callback: value => `${value} ops/s`
+                    }
+                }
+            }
+        }
+    },
+    network: {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Inbound Traffic',
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                data: [],
+                fill: true
+            }, {
+                label: 'Outbound Traffic',
+                borderColor: '#ff9800',
+                backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                data: [],
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#d4d4d4',
+                        padding: 10,
+                        font: {
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(28, 28, 28, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    titleColor: '#fff',
+                    bodyColor: '#d4d4d4',
+                    padding: 12,
+                    boxPadding: 6
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#888',
+                        callback: value => formatBytes(value) + '/s'
+                    }
+                }
+            }
+        }
+    }
+};
+
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+let charts = {};
+const chartContexts = {
+    cpu: document.getElementById('cpuChart'),
+    memory: document.getElementById('memoryChart'),
+    io: document.getElementById('ioChart'),
+    network: document.getElementById('networkChart')
+};
+
+Object.keys(chartContexts).forEach(type => {
+    if (chartContexts[type]) {
+        charts[type] = new Chart(chartContexts[type], chartConfig[type]);
+    }
+});
+
+function updateResourceMonitor(data) {
+    document.getElementById('cpuValue').textContent = `${data.cpu.total}%`;
+    document.getElementById('memoryValue').textContent = formatBytes(data.memory.used);
+    document.getElementById('ioValue').textContent = `${formatNumber(data.io.total)} ops/s`;
+    document.getElementById('networkValue').textContent = `${formatBytes(data.network.total)}/s`;
+
+    document.getElementById('cpuLoadAvg').textContent = `${data.cpu.loadAvg}%`;
+    document.getElementById('memoryUsage').textContent = formatBytes(data.memory.total);
+    document.getElementById('diskIoRate').textContent = `${formatNumber(data.io.rate)} MB/s`;
+    document.getElementById('networkRate').textContent = `${formatBytes(data.network.throughput)}/s`;
+
+    updateTrendIndicator('cpuTrend', data.cpu.trend);
+    updateTrendIndicator('memoryTrend', data.memory.trend);
+    updateTrendIndicator('ioTrend', data.io.trend);
+    updateTrendIndicator('networkTrend', data.network.trend);
+
+    updateChart(data);
+}
+
+function updateTrendIndicator(elementId, trend) {
+    const element = document.getElementById(elementId);
+    const value = parseFloat(trend);
+    element.textContent = `${value >= 0 ? '+' : ''}${value}% from baseline`;
+    element.className = `stat-change ${value >= 0 ? 'positive' : 'negative'}`;
+}
+
+function updateChart(data) {
+    const timestamp = new Date().toLocaleTimeString();
+
+    // Update CPU chart and metrics
+    charts.cpu.data.labels.push(timestamp);
+    charts.cpu.data.datasets[0].data.push(data.cpu.user);
+    charts.cpu.data.datasets[1].data.push(data.cpu.system);
+    if (charts.cpu.data.labels.length > 20) {
+        charts.cpu.data.labels.shift();
+        charts.cpu.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    charts.cpu.update('none');
+    
+    // Update CPU metrics
+    document.getElementById('cpuUserValue').textContent = `${data.cpu.user}%`;
+    document.getElementById('cpuSystemValue').textContent = `${data.cpu.system}%`;
+
+    // Update Memory chart and metrics
+    charts.memory.data.labels.push(timestamp);
+    charts.memory.data.datasets[0].data.push(data.memory.used);
+    charts.memory.data.datasets[1].data.push(data.memory.cached);
+    if (charts.memory.data.labels.length > 20) {
+        charts.memory.data.labels.shift();
+        charts.memory.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    charts.memory.update('none');
+    
+    // Update Memory metrics
+    document.getElementById('memUsedValue').textContent = formatBytes(data.memory.used);
+    document.getElementById('memAvailValue').textContent = formatBytes(data.memory.total - data.memory.used);
+
+    // Update IO chart and metrics
+    charts.io.data.labels.push(timestamp);
+    charts.io.data.datasets[0].data.push(data.io.read);
+    charts.io.data.datasets[1].data.push(data.io.write);
+    if (charts.io.data.labels.length > 20) {
+        charts.io.data.labels.shift();
+        charts.io.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    charts.io.update('none');
+    
+    // Update IO metrics
+    document.getElementById('ioReadValue').textContent = `${formatNumber(data.io.read)} ops/s`;
+    document.getElementById('ioWriteValue').textContent = `${formatNumber(data.io.write)} ops/s`;
+
+    // Update Network chart and metrics
+    charts.network.data.labels.push(timestamp);
+    charts.network.data.datasets[0].data.push(data.network.in);
+    charts.network.data.datasets[1].data.push(data.network.out);
+    if (charts.network.data.labels.length > 20) {
+        charts.network.data.labels.shift();
+        charts.network.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    charts.network.update('none');
+    
+    // Update Network metrics
+    document.getElementById('netInValue').textContent = `${formatBytes(data.network.in)}/s`;
+    document.getElementById('netOutValue').textContent = `${formatBytes(data.network.out)}/s`;
+}
+
+function toggleResourceDetail(show) {
+    const detail = document.querySelector('.resource-detail');
+    const overlay = document.querySelector('.resource-overlay');
+    
+    if (show) {
+        detail.classList.add('show');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    } else {
+        detail.classList.remove('show');
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setInterval(() => {
+        const mockData = generateMockData();
+        updateResourceMonitor(mockData);
+    }, 1000);
+});
+
+function generateMockData() {
+    return {
+        cpu: {
+            total: Math.floor(Math.random() * 100),
+            user: Math.floor(Math.random() * 60),
+            system: Math.floor(Math.random() * 40),
+            loadAvg: Math.floor(Math.random() * 100),
+            trend: (Math.random() * 10 - 5).toFixed(1)
+        },
+        memory: {
+            total: 16 * 1024 * 1024 * 1024, // Fixed total memory: 16GB
+            used: Math.random() * 8 * 1024 * 1024 * 1024,
+            cached: Math.random() * 4 * 1024 * 1024 * 1024,
+            trend: (Math.random() * 10 - 5).toFixed(1)
+        },
+        io: {
+            total: Math.floor(Math.random() * 1000),
+            read: Math.floor(Math.random() * 500),
+            write: Math.floor(Math.random() * 500),
+            rate: Math.floor(Math.random() * 100),
+            trend: (Math.random() * 10 - 5).toFixed(1)
+        },
+        network: {
+            total: Math.random() * 100 * 1024 * 1024,
+            in: Math.random() * 50 * 1024 * 1024,
+            out: Math.random() * 50 * 1024 * 1024,
+            throughput: Math.random() * 100 * 1024 * 1024,
+            trend: (Math.random() * 10 - 5).toFixed(1)
+        }
+    };
+}

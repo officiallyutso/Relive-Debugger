@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debugger GUI - ReLive Debugger</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.0/mermaid.min.js"></script>
@@ -15,6 +17,133 @@
     
 </head>
 <body>
+    <div class="resource-monitor" onclick="toggleResourceDetail(true)">
+        <div class="resource-item">
+            <span>CPU</span>
+            <span class="resource-value" id="cpuValue">0%</span>
+        </div>
+        <div class="resource-item">
+            <span>Memory</span>
+            <span class="resource-value" id="memoryValue">0 MB</span>
+        </div>
+        <div class="resource-item">
+            <span>I/O</span>
+            <span class="resource-value" id="ioValue">0 ops/s</span>
+        </div>
+        <div class="resource-item">
+            <span>Net</span>
+            <span class="resource-value" id="networkValue">0 B/s</span>
+        </div>
+    </div>
+    
+    <div class="resource-overlay" onclick="toggleResourceDetail(false)"></div>
+    
+    <div class="resource-detail">
+        <div class="resource-detail-header">
+            <h2>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 3H6a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h4M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M12 3v18"/>
+                </svg>
+                System Resource Monitor
+            </h2>
+            <button class="close-button" onclick="toggleResourceDetail(false)">×</button>
+        </div>
+    
+        <div class="resource-detail-content">
+            <div class="resource-stats">
+                <div class="stat-card">
+                    <div class="stat-title">CPU Load Average</div>
+                    <div class="stat-value" id="cpuLoadAvg">0%</div>
+                    <div class="stat-change" id="cpuTrend">+0% from last hour</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Memory Usage</div>
+                    <div class="stat-value" id="memoryUsage">0 GB</div>
+                    <div class="stat-change" id="memoryTrend">0% of total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Disk I/O</div>
+                    <div class="stat-value" id="diskIoRate">0 MB/s</div>
+                    <div class="stat-change" id="ioTrend">+0% from average</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Network Throughput</div>
+                    <div class="stat-value" id="networkRate">0 MB/s</div>
+                    <div class="stat-change" id="networkTrend">+0% from baseline</div>
+                </div>
+            </div>
+    
+            <div class="resource-grid">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">CPU Utilization</h3>
+                        <div class="chart-metrics">
+                            <span class="metric-item">
+                                <span>User:</span>
+                                <span class="metric-value" id="cpuUserValue">0%</span>
+                            </span>
+                            <span class="metric-item">
+                                <span>System:</span>
+                                <span class="metric-value" id="cpuSystemValue">0%</span>
+                            </span>
+                        </div>
+                    </div>
+                    <canvas id="cpuChart"></canvas>
+                </div>
+    
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Memory Distribution</h3>
+                        <div class="chart-metrics">
+                            <span class="metric-item">
+                                <span>Used:</span>
+                                <span class="metric-value" id="memUsedValue">0 GB</span>
+                            </span>
+                            <span class="metric-item">
+                                <span>Available:</span>
+                                <span class="metric-value" id="memAvailValue">0 GB</span>
+                            </span>
+                        </div>
+                    </div>
+                    <canvas id="memoryChart"></canvas>
+                </div>
+    
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">I/O Operations</h3>
+                        <div class="chart-metrics">
+                            <span class="metric-item">
+                                <span>Read:</span>
+                                <span class="metric-value" id="ioReadValue">0 ops/s</span>
+                            </span>
+                            <span class="metric-item">
+                                <span>Write:</span>
+                                <span class="metric-value" id="ioWriteValue">0 ops/s</span>
+                            </span>
+                        </div>
+                    </div>
+                    <canvas id="ioChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Network Traffic</h3>
+                        <div class="chart-metrics">
+                            <span class="metric-item">
+                                <span>Inbound:</span>
+                                <span class="metric-value" id="netInValue">0 B/s</span>
+                            </span>
+                            <span class="metric-item">
+                                <span>Outbound:</span>
+                                <span class="metric-value" id="netOutValue">0 B/s</span>
+                            </span>
+                        </div>
+                    </div>
+                    <canvas id="networkChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="sidebar">
         <h2>ReLive Debugger</h2>
         
