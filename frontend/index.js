@@ -1494,7 +1494,7 @@ function generateMockData() {
             trend: (Math.random() * 10 - 5).toFixed(1)
         },
         memory: {
-            total: 16 * 1024 * 1024 * 1024, // Fixed total memory: 16GB
+            total: Math.floor(Math.random() * 16 * 1024 * 1024 * 1024),
             used: Math.random() * 8 * 1024 * 1024 * 1024,
             cached: Math.random() * 4 * 1024 * 1024 * 1024,
             trend: (Math.random() * 10 - 5).toFixed(1)

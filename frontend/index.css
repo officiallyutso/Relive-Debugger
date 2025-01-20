@@ -112,6 +112,19 @@ body {
     grid-template-rows: 1fr 250px 200px;
     overflow: hidden;
 }
+.debugger-logo {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    margin-right: 10px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+h2 {
+    display: flex;
+    align-items: center;
+}
 
 h2, h3 {
     color: #ffffff;
